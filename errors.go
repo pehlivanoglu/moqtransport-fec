@@ -138,10 +138,6 @@ var (
 		code:    ErrorCodeProtocolViolation,
 		message: "max request ID decreased",
 	}
-	errUnknownRequestID = ProtocolError{
-		code:    ErrorCodeProtocolViolation,
-		message: "unknown request ID",
-	}
 	errUnknownAnnouncement = ProtocolError{
 		code:    ErrorCodeProtocolViolation,
 		message: "unknown announcement",
