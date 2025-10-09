@@ -25,7 +25,7 @@ type CounterPublisher struct {
 	mutex sync.RWMutex
 }
 
-func New(publisher moqtransport.Publisher, sessionID, requestID uint64) *CounterPublisher {
+func NewCounterPublisher(publisher moqtransport.Publisher, sessionID, requestID uint64) *CounterPublisher {
 	return &CounterPublisher{
 		publisher: publisher,
 		sessionID: sessionID,

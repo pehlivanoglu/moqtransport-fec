@@ -256,7 +256,7 @@ func (h *counterHandler) getSubscribeHandler(sessionID uint64) moqtransport.Subs
 			return
 		}
 		log.Printf("sessionNr: %d accepted subscription for namespace %v track %v", sessionID, m.Namespace, m.Track)
-		counterPublisher := New(w, sessionID, m.RequestID)
+		counterPublisher := NewCounterPublisher(w, sessionID, m.RequestID)
 		h.lock.Lock()
 		h.publishers[counterPublisher] = struct{}{}
 		h.lock.Unlock()
