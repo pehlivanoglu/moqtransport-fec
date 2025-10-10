@@ -115,7 +115,7 @@ func runServer(opts *options) error {
 		namespace:  []string{opts.namespace},
 		trackname:  opts.trackname,
 		publish:    opts.publish,
-		subscribe:  opts.subscribe,
+		subscribe:  false,
 		publishers: make(map[moqtransport.Publisher]struct{}),
 	}
 	return h.runServer(context.TODO())
@@ -128,9 +128,9 @@ func runClient(opts *options) error {
 		tlsConfig:  nil,
 		namespace:  []string{opts.namespace},
 		trackname:  opts.trackname,
-		publish:    opts.publish,
+		publish:    false,
 		subscribe:  opts.subscribe,
-		publishers: make(map[moqtransport.Publisher]struct{}),
+		publishers: nil,
 	}
 	return h.runClient(context.TODO())
 }
@@ -142,7 +142,7 @@ func generateTLSConfigWithCertAndKey(certFile, keyFile string) (*tls.Config, err
 	}
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
-		NextProtos:   []string{"moq-00", "h3"},
+		NextProtos:   []string{"moq-00"},
 	}, nil
 }
 
@@ -166,7 +166,7 @@ func generateTLSConfig() (*tls.Config, error) {
 	}
 	return &tls.Config{
 		Certificates: []tls.Certificate{tlsCert},
-		NextProtos:   []string{"moq-00", "h3"},
+		NextProtos:   []string{"moq-00"},
 	}, nil
 }
 
