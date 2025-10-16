@@ -31,7 +31,7 @@ type XORCounterSubscriber struct {
 }
 
 func NewXORSubscriber(remoteTrack *moqtransport.RemoteTrack, sessionID uint64, namespace []string, trackname string) *XORCounterSubscriber {
-	config := xor.DefaultConfig()
+	config := xor.Config{BlockSize: 4}
 	return &XORCounterSubscriber{
 		remoteTrack:    remoteTrack,
 		decoder:        xor.NewDecoder(config),
@@ -122,7 +122,7 @@ func (fcs *XORCounterSubscriber) processObject(obj *moqtransport.Object) error {
 	}
 
 	// Decode with XOR-FEC
-	decodedPayload, wasRecovered := fcs.decoder.Decode(blockID, seqInBlock, payload, isParity)
+	decodedPayload, wasRecovered := fcs.decoder.TryDecode(blockID, seqInBlock, payload, isParity)
 
 	// Skip if it's a parity packet with no recovery
 	if isParity && decodedPayload == nil {

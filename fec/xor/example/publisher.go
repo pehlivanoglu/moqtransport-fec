@@ -28,7 +28,7 @@ type XORCounterPublisher struct {
 }
 
 func NewXORPublisher(publisher moqtransport.Publisher, sessionID, requestID uint64) *XORCounterPublisher {
-	config := xor.DefaultConfig()
+	config := xor.Config{BlockSize: 4}
 	return &XORCounterPublisher{
 		publisher: publisher,
 		encoder:   xor.NewEncoder(config),
@@ -85,24 +85,21 @@ func (fcp *XORCounterPublisher) publishNext() error {
 
 	payload := []byte(strconv.FormatUint(currentCounter, 10))
 
-	dataPackets, parityPacket, blockID, seqInBlock := fcp.encoder.Encode(currentCounter, payload)
+	parityPacket, blockID, seqID := fcp.encoder.TryEncode(payload)
 
-	for i, dataPayload := range dataPackets {
-		obj := moqtransport.Object{
-			GroupID:              currentGroupID,
-			ObjectID:             0,
-			SubGroupID:           currentGroupID,
-			Payload:              fcp.wrapWithMetadata(dataPayload, blockID, seqInBlock, false),
-			ForwardingPreference: moqtransport.ObjectForwardingPreferenceDatagram,
-		}
-
-		if err := fcp.publisher.SendDatagram(obj); err != nil {
-			return fmt.Errorf("failed to send data packet %d: %w", i, err)
-		}
-		log.Printf("Published: counter=%d, blockID=%d, seqInBlock=%d", currentCounter, blockID, seqInBlock)
+	obj := moqtransport.Object{
+		GroupID:              currentGroupID,
+		ObjectID:             0,
+		SubGroupID:           currentGroupID,
+		Payload:              fcp.wrapWithMetadata(payload, blockID, seqID, false),
+		ForwardingPreference: moqtransport.ObjectForwardingPreferenceDatagram,
 	}
 
-	// Send parity packet if generated
+	if err := fcp.publisher.SendDatagram(obj); err != nil {
+		return fmt.Errorf("failed to send data packet %d: %w", obj, err)
+	}
+	log.Printf("Published: counter=%d, blockID=%d, seqInBlock=%d", currentCounter, blockID, seqID)
+
 	if parityPacket != nil {
 		parityObj := moqtransport.Object{
 			GroupID:              currentGroupID + 1000, // Use different GroupID for parity

@@ -5,58 +5,45 @@ import (
 )
 
 type Config struct {
-	BlockSize int // Number of data packets per block (N)
-}
-
-func DefaultConfig() Config {
-	return Config{
-		BlockSize: 4, // Default to 4 data packets per block
-	}
+	BlockSize int
 }
 
 type Encoder struct {
-	config   Config
-	blockID  int
-	buffer   [][]byte
-	seqCount int
-	mutex    sync.Mutex
+	config  Config
+	blockID int
+	seqID   int
+	buffer  [][]byte
+	mutex   sync.Mutex
 }
 
 func NewEncoder(config Config) *Encoder {
 	return &Encoder{
 		config:  config,
 		blockID: 0,
+		seqID:   0,
 		buffer:  make([][]byte, 0, config.BlockSize),
 	}
 }
 
-func (e *Encoder) Encode(seq uint64, payload []byte) (dataPackets [][]byte, parityPacket []byte, blockID int, seqInBlock int) {
+func (e *Encoder) TryEncode(payload []byte) (parityPacket []byte, blockID int, seqID int) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	// Add payload to current block
 	e.buffer = append(e.buffer, payload)
-	currentSeqInBlock := e.seqCount
-	currentBlockID := e.blockID
-	e.seqCount++
+	e.seqID++
 
-	// Always return the current data packet
-	dataPackets = [][]byte{payload}
+	blockID = e.blockID
+	seqID = e.seqID
 
-	// If block is not full, just return the current packet
-	if len(e.buffer) < e.config.BlockSize {
-		return dataPackets, nil, currentBlockID, currentSeqInBlock
+	if e.seqID < e.config.BlockSize {
+		return nil, blockID, seqID
 	}
 
-	// Block is full, generate parity packet
 	parityData := e.generateParity(e.buffer)
 
-	// Reset for next block
-	e.buffer = make([][]byte, 0, e.config.BlockSize)
-	e.blockID++
-	e.seqCount = 0
+	e.flushEncoder()
 
-	return dataPackets, parityData, currentBlockID, currentSeqInBlock
+	return parityData, blockID, seqID
 }
 
 func (e *Encoder) generateParity(packets [][]byte) []byte {
@@ -64,7 +51,6 @@ func (e *Encoder) generateParity(packets [][]byte) []byte {
 		return nil
 	}
 
-	// Find maximum packet size
 	maxLen := 0
 	for _, packet := range packets {
 		if len(packet) > maxLen {
@@ -82,19 +68,24 @@ func (e *Encoder) generateParity(packets [][]byte) []byte {
 	return parity
 }
 
-type Decoder struct {
-	config Config
-	blocks map[int]*Block
-	mutex  sync.RWMutex
+func (enc *Encoder) flushEncoder() {
+	enc.buffer = make([][]byte, 0, enc.config.BlockSize)
+	enc.blockID++
+	enc.seqID = 0
 }
 
-// Block of packets being decoded
 type Block struct {
 	dataPackets  map[int][]byte // seq -> payload
 	parityPacket []byte
 	receivedData int
 	hasParity    bool
 	size         int
+}
+
+type Decoder struct {
+	config Config
+	blocks map[int]*Block
+	mutex  sync.RWMutex
 }
 
 func NewDecoder(config Config) *Decoder {
@@ -104,8 +95,7 @@ func NewDecoder(config Config) *Decoder {
 	}
 }
 
-// Returns payload if available/recovered
-func (d *Decoder) Decode(blockID int, seqInBlock int, payload []byte, isParity bool) ([]byte, bool) {
+func (d *Decoder) TryDecode(blockID int, seqInBlock int, payload []byte, isParity bool) ([]byte, bool) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
