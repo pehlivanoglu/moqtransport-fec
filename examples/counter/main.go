@@ -15,15 +15,27 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/mengelbart/moqtransport"
-	"github.com/mengelbart/moqtransport/quicmoq"
+	quicmoq "github.com/mengelbart/moqtransport/quicmoq"
 	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/logging"
 )
 
 const (
 	appName = "counter"
 )
+
+var loggerCfg = &quicmoq.LoggerConfig{
+	LogLevel:          quicmoq.LogLevelInfo,
+	MaxEventsPerType:  1000,
+	EnableTerminalLog: true,
+	WindowMode:        quicmoq.ByPackets,
+	WindowPackets:     100,
+}
+
+var serverQuicLogger = quicmoq.NewQuicLogger("counter-server", logging.PerspectiveServer, loggerCfg)
 
 var usg = `%s acts either as a MoQ server or client with a track
 that publishes/subscribes to counter data.
@@ -195,12 +207,18 @@ func (h *counterHandler) runClient(ctx context.Context) error {
 }
 
 func (h *counterHandler) runServer(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	listener, err := quic.ListenAddr(h.addr, h.tlsConfig, &quic.Config{
 		EnableDatagrams: true,
+		Tracer:          serverQuicLogger.CreateConnectionTracer(),
 	})
 	if err != nil {
 		return err
 	}
+
+	go logServerMetrics(ctx, serverQuicLogger)
 
 	log.Printf("MOQ server listening on %s", h.addr)
 
@@ -320,4 +338,19 @@ func tupleEqual(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func logServerMetrics(ctx context.Context, logger *quicmoq.QuicLogger) {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m := logger.GetRollingMetrics()
+			log.Printf("QUIC metrics: window=%v sent=%d acked=%d lost=%d loss=%.2f%% send=%.1f kbps recv=%.1f kbps rtt=%v", m.Window, m.SentPackets, m.AckedPackets, m.LostPackets, m.LossPercent, m.SendRateBps/1000, m.RecvRateBps/1000, m.SmoothedRTT)
+		}
+	}
 }

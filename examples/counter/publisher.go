@@ -48,7 +48,7 @@ func (cp *CounterPublisher) Start(ctx context.Context) error {
 
 	log.Printf("Starting counter publisher (session: %d, request: %d)", cp.sessionID, cp.requestID)
 
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Second / 100)
 	defer ticker.Stop()
 
 	for {
@@ -105,8 +105,8 @@ func (cp *CounterPublisher) publishNext() error {
 		return fmt.Errorf("failed to send datagram for counter %d: %w", currentCounter, err)
 	}
 
-	log.Printf("Published MoQ-Datagram: %d",
-		currentCounter)
+	// log.Printf("Published MoQ-Datagram: %d",
+	// currentCounter)
 
 	return nil
 }
